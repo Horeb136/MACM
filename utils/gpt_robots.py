@@ -1,163 +1,97 @@
+# gpt_robots.py
+
 import os
-from openai import OpenAI
-os.environ["OPENAI_API_KEY"] = "" # Enter your OpenAi Key
-client = OpenAI()
+from dotenv import load_dotenv
 
-   
-def generate_from_thinker(prompts, max_tokens, model="gpt-4-1106-preview", temperature=0.7, n=1):
-    assistant = client.beta.assistants.create(
-        model=model,
-        instructions="""You are a thinker. I need you to help me think about some problems.
-        You need to provide me the answer based on the format of the example.""",
-        name="Thinker",
-        tools=[{"type": "code_interpreter"}],
+# IMPORTANT: adjust this import path to point to your actual utils.py
+from utils.gpt_utils import local_chat_completion  
+
+load_dotenv()
+
+def generate_from_thinker(prompts, max_tokens=512, temperature=0.7, n=1):
+    """
+    Mimics the 'thinker' assistant by prepending a 'thinker' instruction
+    and then passing all user messages to the local DeepSeek model.
+    """
+    # The 'thinker' instruction
+    thinker_instructions = (
+        "You are a thinker. I need you to help me think about some problems. "
+        "You need to provide me the answer based on the format of the example.\n"
     )
+    # Build the prompt from the instructions + user messages
+    prompt_text = thinker_instructions
+    for message in prompts:
+        prompt_text += f"User: {message['content']}\n"
+    prompt_text += "Assistant: "  # marks where the model’s answer should start
 
-    thread = client.beta.threads.create()
-    for i in range(len(prompts)):   
-        message = prompts[i]["content"]
-
-        thread_message = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=message,
-        ) 
-        
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant.id,
-        )      
-        while run.status in ["queued", "in_progress"]:
-            keep_retrieving_run = client.beta.threads.runs.retrieve(
-                thread_id=thread.id,
-                run_id=run.id
-            )
-            
-            if keep_retrieving_run.status == "completed":
-                # print("\n")
-
-                all_messages = client.beta.threads.messages.list(
-                    thread_id=thread.id
-                )
-                # print(f"all_messages:\n{all_messages}")
-                
-                try:
-                    Assistant_response = all_messages.data[0].content[0].text.value
-                except Exception as e:
-                    print(f"An error occurred: {e}") # Avoid the image outputs
-                    Assistant_response = "I need to rethink this problem."
-                break
-
-            elif keep_retrieving_run.status == "queued" or keep_retrieving_run.status == "in_progress":
-                pass
-            else:
-                print(f"Run status: {keep_retrieving_run.status}")
-                break
-    return Assistant_response  
-        
-
-
-def generate_from_judge(prompts, max_tokens, model="gpt-4-1106-preview", temperature=0.7, n=1):
-
-    assistant = client.beta.assistants.create(
-        model=model,
-        instructions="""You're a judge. I need you to make judgments on some statements.""",
-        name="Judge",
-        tools=[{"type": "code_interpreter"}],
+    # Call your local model
+    responses = local_chat_completion(
+        prompt=prompt_text,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        n=n
     )
+    # Return the first response (or all, if you prefer)
+    return responses[0].strip()
 
-    thread = client.beta.threads.create()
-    for i in range(len(prompts)):   
-        message = prompts[i]["content"]
-
-        thread_message = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=message,
-        ) 
-        
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant.id,
-        )      
-        while run.status in ["queued", "in_progress"]:
-            keep_retrieving_run = client.beta.threads.runs.retrieve(
-                thread_id=thread.id,
-                run_id=run.id
-            )
-            
-            if keep_retrieving_run.status == "completed":
-                # print("\n")
-
-                all_messages = client.beta.threads.messages.list(
-                    thread_id=thread.id
-                )
-                # print(f"all_messages:\n{all_messages}")
-                
-                try:
-                    Assistant_response = all_messages.data[0].content[0].text.value
-                except Exception as e:
-                    print(f"An error occurred: {e}") # Avoid the image outputs
-                    Assistant_response = "False"
-                break
-
-            elif keep_retrieving_run.status == "queued" or keep_retrieving_run.status == "in_progress":
-                pass
-            else:
-                print(f"Run status: {keep_retrieving_run.status}")
-                break
-    return Assistant_response
-
-
-
-def generate_from_excutor(prompts, max_tokens, model="gpt-4-1106-preview", temperature=0.7, n=1):
-    assistant = client.beta.assistants.create(
-        model=model,
-        instructions="""You're an excutor. I need you to calculate the final result based on some conditions and steps.
-        You need to provide me the answer based on the format of the examples.""",
-        name="Excutor",
-        tools=[{"type": "code_interpreter"}],
+def generate_from_judge(prompts, max_tokens=512, temperature=0.7, n=1):
+    """
+    Mimics the 'judge' assistant by prepending a 'judge' instruction
+    and then passing all user messages to the local DeepSeek model.
+    """
+    judge_instructions = (
+        "You're a judge. I need you to make judgments on some statements. "
+        "Be concise in your reasoning.\n"
     )
+    prompt_text = judge_instructions
+    for message in prompts:
+        prompt_text += f"User: {message['content']}\n"
+    prompt_text += "Assistant: "
 
-    thread = client.beta.threads.create()
-    for i in range(len(prompts)):   
-        message = prompts[i]["content"]
+    responses = local_chat_completion(
+        prompt=prompt_text,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        n=n
+    )
+    return responses[0].strip()
 
-        thread_message = client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=message,
-        ) 
-        
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant.id,
-        )      
-        while run.status in ["queued", "in_progress"]:
-            keep_retrieving_run = client.beta.threads.runs.retrieve(
-                thread_id=thread.id,
-                run_id=run.id
-            )
-            
-            if keep_retrieving_run.status == "completed":
-                # print("\n")
+def generate_from_excutor(prompts, max_tokens=512, temperature=0.7, n=1):
+    """
+    Mimics the 'excutor' (executor) assistant by prepending an 'excutor' instruction
+    and then passing all user messages to the local DeepSeek model.
+    """
+    excutor_instructions = (
+        "You're an excutor. I need you to calculate the final result based on "
+        "some conditions and steps. You need to provide me the answer based on "
+        "the format of the examples.\n"
+    )
+    prompt_text = excutor_instructions
+    for message in prompts:
+        prompt_text += f"User: {message['content']}\n"
+    prompt_text += "Assistant: "
 
-                all_messages = client.beta.threads.messages.list(
-                    thread_id=thread.id
-                )
-                # print(f"all_messages:\n{all_messages}")
-                
-                try:
-                    Assistant_response = all_messages.data[0].content[0].text.value
-                except Exception as e:
-                    print(f"An error occurred: {e}") # Avoid the image outputs
-                    Assistant_response = "False"
-                break
+    responses = local_chat_completion(
+        prompt=prompt_text,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        n=n
+    )
+    return responses[0].strip()
 
-            elif keep_retrieving_run.status == "queued" or keep_retrieving_run.status == "in_progress":
-                pass
-            else:
-                print(f"Run status: {keep_retrieving_run.status}")
-                break
-    return Assistant_response
+# Example usage:
+if __name__ == "__main__":
+    # Example: Thinker
+    test_prompts = [{"role": "user", "content": "Explain how to find the derivative of x^2."}]
+    thinker_response = generate_from_thinker(test_prompts, max_tokens=200, temperature=0.7, n=1)
+    print("Thinker response:", thinker_response)
 
+    # Example: Judge
+    judge_prompts = [{"role": "user", "content": "Is the statement 'x^2 grows faster than x' correct?"}]
+    judge_response = generate_from_judge(judge_prompts, max_tokens=200, temperature=0.7, n=1)
+    print("Judge response:", judge_response)
+
+    # Example: Excutor
+    excutor_prompts = [{"role": "user", "content": "Compute the sum of 1+2+3+...+100."}]
+    excutor_response = generate_from_excutor(excutor_prompts, max_tokens=200, temperature=0.7, n=1)
+    print("Excutor response:", excutor_response)
